@@ -115,8 +115,9 @@ import [starImport];
 [/if]
 [generateImmutableMembers type]
 [generateLazyValues type]
+[generateInterning type]
 [generateSingletonInstance type]
-[generateConstructionAndInterning type]
+[generateConstruction type]
   [generateImmutableCopyOf type]
   [generateSerialization type]
 [if type.useBuilder and (not type.constitution.isOutsideBuilder)]
@@ -124,7 +125,7 @@ import [starImport];
     [for parameters = type.builderParameters]
 
   /**
-   * Creates a builder for {@link [type.typeValue] [type.typeValue.simple]}.
+   * Creates a builder for {@link [type.typeValue.relative] [type.typeValue.simple]}.
 [for p in parameters]
    * @param [p.name] {@code [p.name]} parameter[if p.nullable], can be {@code null}[/if]
 [/for]
@@ -350,7 +351,7 @@ private static class SerialForm implements java.io.Serializable {
       if (elements.length == 1) {
         return elements['[0]'];
       }
-      throw new [type.throwForInvalidImmutableState]("Cannot decide scalar value for attribute '"
+      throw new [type.throwForInvalidImmutableState]("Cannot extract scalar value for attribute '"
           + attribute + "' from array of length " + elements.length);
     }
     return value;
@@ -389,7 +390,7 @@ private Object writeReplace() {
 [/if]
 [/template]
 
-[template generateConstructionAndInterning Type type]
+[template generateInterning Type type]
 [if type.useInterned or type.generateOrdinalValue]
   [if not type.useSingletonOnly]
 
@@ -477,6 +478,9 @@ private Object writeReplace() {
   private static final [guava].collect.Interner<InternProxy> INTERNER = [guava].collect.Interners.newStrongInterner();
   [/if]
 [/if]
+[/template]
+
+[template generateConstruction Type type]
 [if type.useConstructor and (not type.factoryOf.new)]
   [if type.requiresAlternativeStrictConstructor]
 
@@ -554,7 +558,7 @@ private Object writeReplace() {
  * @param instance The instance to copy
  * @return A copied immutable [type.name] instance
  */
-public static [type.typeValue.relative] [type.factoryCopyOf.applied]([if type.constitution.isImplementationPrimary][type.typeImmutable.relative][else][type.typeAbstract.relative][/if] instance) {
+[if not type.constitution.isImplementationPrimary]public [/if]static [type.typeValue.relative] [type.factoryCopyOf.applied]([type.typeAbstract.relative] instance) {
   if (instance instanceof [type.typeImmutable.relative]) {
     return ([type.typeImmutable.simple]) instance;
   }
@@ -642,7 +646,7 @@ public static [type.typeValue.relative] [type.factoryCopyOf.applied]([if type.co
  * {@code [type.factoryOf](..)}.
  * Call the {@link #[type.names.build]()} method to get a result of type {@code [type.typeValue]}.
 [else]
- * Builds instances of type {@link [type.typeValue] [type.typeValue.simple]}.
+ * Builds instances of type {@link [type.typeValue.relative] [type.typeValue.simple]}.
  * Initialize attributes and then invoke the {@link #[type.names.build]()} method to create an
  * immutable instance.
 [/if]
@@ -684,7 +688,7 @@ public static [type.typeValue.relative] [type.factoryCopyOf.applied]([if type.co
 [if type.kind.isFactory]
    * Creates a {@code [type.typeBuilderImpl.simple]} factory builder.
 [else]
-   * Creates a builder for {@link [type.typeValue] [type.typeValue.simple]} instances.
+   * Creates a builder for {@link [type.typeValue.relative] [type.typeValue.simple]} instances.
 [/if]
 [for p in parameters]
    * @param [p.name] {@code [p.name]} parameter[if p.nullable], can be {@code null}[/if]
@@ -731,7 +735,7 @@ public static [type.typeValue.relative] [type.factoryCopyOf.applied]([if type.co
 [if type.kind.isFactory]
    * Creates a {@code [type.typeBuilderImpl.simple]} factory builder.
 [else]
-   * Creates a builder for {@link [type.typeValue] [type.typeValue.simple]} instances.
+   * Creates a builder for {@link [type.typeValue.relative] [type.typeValue.simple]} instances.
 [/if]
 [for p in parameters]
    * @param [p.name] {@code [p.name]} parameter[if p.nullable], can be {@code null}[/if]
@@ -766,13 +770,13 @@ public static [type.typeValue.relative] [type.factoryCopyOf.applied]([if type.co
   [if type.generateBuilderFrom]
     [if type.buildFromTypes and type.buildFromTypes.hasManySupertypes]
       [for s in type.buildFromTypes.supertypes]
+  [if type.constitution.isImplementationPrimary and (s.type eq type.typeAbstract.toString)]
 
   /**
-   * Fill a builder with attribute values from the provided {@link [s.type]} instance.
+   * Fill a builder with attribute values from the provided {@code [type.typeImmutable.simple]} instance.
    * @param instance The instance from which to copy values
    * @return {@code this} builder for use in a chained invocation
    */
-  [if type.constitution.isImplementationPrimary and (s.type eq type.typeAbstract.toString)]
   public final [builderReturnType type] [type.names.from]([type.typeImmutable.relative] instance) {
     [requireNonNull type](instance, "instance");
     from((Object) instance);
@@ -790,6 +794,12 @@ public static [type.typeValue.relative] [type.factoryCopyOf.applied]([if type.co
     [builderReturnThis type]
   }
   [else]
+
+  /**
+   * Fill a builder with attribute values from the provided {@code [s.type]} instance.
+   * @param instance The instance from which to copy values
+   * @return {@code this} builder for use in a chained invocation
+   */
   public final [builderReturnType type] [type.names.from]([s.type] instance) {
     [requireNonNull type](instance, "instance");
     from((Object) instance);
@@ -823,7 +833,7 @@ public static [type.typeValue.relative] [type.factoryCopyOf.applied]([if type.co
     [else]
 
   /**
-   * Fill a builder with attribute values from the provided {@link [type.typePreferablyAbstract.relative]} instance.
+   * Fill a builder with attribute values from the provided {@link [if type.constitution.isImplementationPrimary][type.typeImmutable.simple][else][type.typeAbstract.simple][/if]} instance.
    * Regular attribute values will be replaced with those from the given instance.
    * Absent optional values will not replace present values.
   [if type.hasSettableCollection or type.hasSettableMapping]
@@ -976,9 +986,13 @@ checkNotIsSet([v.names.isSet](), "[v.name]");
    * @return {@code this} builder for chained invocation
    */
   [deprecation v]
-  public final [builderReturnType type] [v.names.init]([atNullableAccept v][v.unwrappedElementType] [v.name]) {
+  public final [builderReturnType type] [v.names.init]([unwrappedOptionalType v] [v.name]) {
     [checkNotIsSet v]
+  [if v.jdkOptional]
+    this.[v.name] = [if v.jdkSpecializedOptional or v.optionalAcceptNullable][v.name][else][requireNonNull type]([v.name], "[v.name]")[/if];
+  [else]
     this.[v.name] = [optionalOf v]([v.name]);
+  [/if]
     [nondefaultSetInBuilder v]
     [builderReturnThis type]
   }
@@ -992,7 +1006,11 @@ checkNotIsSet([v.names.isSet](), "[v.name]");
   [deprecation v]
   [builderInitAccess v]final [builderReturnType type] [v.names.init]([v.rawType][if not v.jdkSpecializedOptional]<[v.wrappedElementType]>[/if] [v.name]) {
     [checkNotIsSet v]
+  [if v.jdkOptional]
+    this.[v.name] = [if v.jdkSpecializedOptional][v.name].isPresent() ? [v.name].getAs[toUpper v.unwrappedElementType]() : null[else][v.name].orElse(null)[/if];
+  [else]
     this.[v.name] = [requireNonNull type]([v.name], "[v.name]");
+  [/if]
     [nondefaultSetInBuilder v]
     [builderReturnThis type]
   }
@@ -1192,7 +1210,7 @@ checkNotIsSet([v.names.isSet](), "[v.name]");
    * Invokes {@code [type.factoryOf](..)} using the collected parameters and returns the result of the invocation
    * @return A result of type {@code [type.typeValue]}
   [else]
-   * Builds a new {@link [type.typeValue] [type.typeValue.simple]}.
+   * Builds a new {@link [type.typeValue.relative] [type.typeValue.simple]}.
    * @return An immutable instance of [type.name]
   [/if]
    * @throws [type.throwForInvalidImmutableState] if any required attributes are missing
@@ -1209,7 +1227,7 @@ checkNotIsSet([v.names.isSet](), "[v.name]");
    * Invokes {@code [type.factoryOf](..)} using the collected parameters and returns the result of the invocation
    * @return A result of type {@code [type.typeValue]}
   [else]
-   * Builds a new {@link [type.typeValue] [type.typeValue.simple]}.
+   * Builds a new {@link [type.typeValue.relative] [type.typeValue.simple]}.
    * @return An immutable instance of [type.name]
   [/if]
    * @throws The supplied exception {@code T} if any required attributes are missing
@@ -1325,7 +1343,9 @@ return [type.factoryOf]([output.linesShortable][for v in type.settableAttributes
 [/template]
 
 [template emptyImmutableInstanceInferred Type type Attribute v][output.trim]
-[if v.optionalType]
+[if v.jdkOptional]
+  null
+[else if v.optionalType]
   [optionalEmpty v]
 [else if v.mapType]
   [if v.generateJdkOnly]
@@ -1422,6 +1442,8 @@ this.[n] = [requireNonNull type]([invokeSuper v].[v.names.get](), "[v.name]");
 [for v in type.constructorArguments, n = v.name]
   [if v.attributeValueType]
     this.[n] = [if v.nullable][n] == null ? null : [/if][v.attributeValueType.factoryCopyOf]([n]);
+  [else if v.jdkOptional]
+    this.[n] = [if v.jdkSpecializedOptional][n].isPresent() ? [n].getAs[toUpper v.unwrappedElementType]() : null[else][n].orElse(null)[/if];
   [else if v.collectionType or v.mapType]
     this.[n] = [immutableCollectionCopyOf v n];
   [else if v.primitive or v.nullable]
@@ -1657,7 +1679,8 @@ static final [output.linesShortable]class Json
  */
 @Deprecated
 @com.fasterxml.jackson.annotation.JsonCreator
-static [type.typeValue.relative] fromJson([if type.settableAttributes]Json json[else]java.util.Map<String, Object> json[/if]) {
+static [type.typeImmutable.relative] fromJson([if type.settableAttributes]Json json[else]java.util.Map<String, Object> json[/if]) {
+[let cast][if type.constitution.returnsAbstractValueType]([type.typeImmutable.relative]) [/if][/let]
 [if type.useBuilder]
   [type.typeBuilder.relative] builder = [type.factoryBuilder.relative]();
   [for v in type.settableAttributes]
@@ -1671,16 +1694,16 @@ static [type.typeValue.relative] fromJson([if type.settableAttributes]Json json[
       [/if]
   }
   [/for]
-  return builder.[type.names.build]();
+  return [cast]builder.[type.names.build]();
 [else if type.useSingletonOnly]
-  return [type.factoryInstance.relative]();
+  return [cast][type.factoryInstance.relative]();
 [else]
     [if type.useConstructor]
-  [type.typeValue.relative] instance = [type.factoryOf.relative]([for v in type.constructorArguments][if not for.first], [/if]json.[v.name][/for]);
+  [type.typeImmutable.relative] instance = [cast][type.factoryOf.relative]([for v in type.constructorArguments][if not for.first], [/if]json.[v.name][/for]);
     [else if type.useSingleton]
-  [type.typeValue.relative] instance = [type.factoryInstance.relative]();
+  [type.typeImmutable.relative] instance = [cast][type.factoryInstance.relative]();
     [else]
-  [output.error]Cannot generate code when there are no builders, constructors or singletons available[/output.error]
+  [output.error]Cannot generate JSON code when there are no builders, constructors or singletons available[/output.error]
     [/if]
   [for o in type.withSettableAfterConstruction]
   if (json.[o.name] != null) {
@@ -1724,6 +1747,16 @@ public Class<? extends java.lang.annotation.Annotation> annotationType() {
 [/for]
 [deprecation v]
 @Override
+  [if v.jdkOptional]
+[v.access][v.type] [v.names.get]() {
+[if v.jdkSpecializedOptional]
+  return [v.name] != null
+      ? [v.rawType].of([v.name])
+      : [v.rawType].empty();
+[else]
+  return [v.rawType].ofNullable([v.name]);
+[/if]
+  [else]
 [v.access][v.atNullability][immutableImplementationType v] [v.names.get]() {
 [if type.generateSafeDerived and (v.generateDerived or v.generateDefault)]
   return [disambiguateField type 'initShim'] != null
@@ -1734,6 +1767,7 @@ public Class<? extends java.lang.annotation.Annotation> annotationType() {
 [else]
   return [v.name];
 [/if]
+  [/if]
 }
   [/for]
   [if type.generateOrdinalValue]
@@ -1806,7 +1840,7 @@ private boolean equalTo([equalToType] another) {
 [for v in getters]
 [if v.arrayType]
   [h] = [h] * 17 + java.util.Arrays.hashCode([v.name]);
-[else if v.nullable]
+[else if v.nullable or v.jdkOptional]
   [h] = [h] * 17 + [if type.generateJdkOnly][objectsUtilRef type]hashCode[else][guava].base.Objects.hashCode[/if]([v.name]);
 [else if v.primitive]
   [h] = [h] * 17 + [primitiveHashCode v];
@@ -1885,6 +1919,8 @@ public String toString() {
   [for v in type.equivalenceAttributes]
   [if v.arrayType]
       + "[if not for.first], [/if][v.name]=" + java.util.Arrays.toString([v.name])
+  [else if v.jdkOptional]
+      + "[if not for.first], [/if][v.name]=" + [v.names.get]()
   [else]
       + "[if not for.first], [/if][v.name]=" + [v.name]
   [/if]
@@ -1895,6 +1931,8 @@ public String toString() {
   [for v in type.equivalenceAttributes]
   [if v.arrayType]
       .add("[v.name]", java.util.Arrays.toString([v.name]))
+  [else if v.jdkOptional]
+      .add("[v.name]", [v.names.get]())
   [else]
       .add("[v.name]", [v.name])
   [/if]
@@ -1959,7 +1997,7 @@ return [validated type true]new [type.typeImmutable.relative]([output.linesShort
 [varargsSafety v]
 [deprecation v]
 public final [type.typeImmutable.simple] [v.names.with]([v.elementType]... elements) {
-  [immutableImplementationType v] newValue = [if v.nullable]elements == null ? null : [/if]elements.clone();
+  [v.atNullabilityLocal][immutableImplementationType v] newValue = [if v.nullable]elements == null ? null : [/if]elements.clone();
   [generateReturnCopyContextual type v]
 }
     [else if v.collectionType]
@@ -2004,8 +2042,19 @@ public final [type.typeImmutable.simple] [v.names.with](Iterable<[v.consumedElem
  * @return A modified copy of {@code this} object
  */
 [deprecation v]
-public final [type.typeImmutable.simple] [v.names.with]([atNullableAccept v][v.unwrappedElementType] value) {
+public final [type.typeImmutable.simple] [v.names.with]([unwrappedOptionalType v] value) {
+[if v.jdkOptional]
+  [if v.primitiveElement or (v.jdkSpecializedOptional or v.optionalAcceptNullable)]
+  [immutableImplementationType v] newValue = value;
+  [else]
+  [immutableImplementationType v] newValue = [requireNonNull type](value, "[v.name]");
+  [/if]
+  [if v.unwrappedElementType ne 'double']
+  if (this.[v.name] == newValue) return this;
+  [/if]
+[else]
   [immutableImplementationType v] newValue = [optionalOf v](value);
+[/if]
   [generateReturnCopyContextual type v]
 }
 
@@ -2017,8 +2066,15 @@ public final [type.typeImmutable.simple] [v.names.with]([atNullableAccept v][v.u
  */
 [deprecation v]
 public final [type.typeImmutable.simple] [v.names.with]([v.rawType][if not v.jdkSpecializedOptional]<[v.wrappedElementType]>[/if] optional) {
-  if (this.[v.name] == optional) return this;
+[if v.jdkOptional]
+  [immutableImplementationType v] newValue = [if v.jdkSpecializedOptional]optional.isPresent() ? optional.getAs[toUpper v.unwrappedElementType]() : null[else]optional.orElse(null)[/if];
+  [if v.unwrappedElementType ne 'double']
+  if (this.[v.name] == newValue) return this;
+  [/if]
+[else]
   [immutableImplementationType v] newValue = [requireNonNull type](optional, "[v.name]");
+  if (this.[v.name] == newValue) return this;
+[/if]
   [generateReturnCopyContextual type v]
 }
     [else if v.mapType]
@@ -2110,7 +2166,7 @@ interface [type.typeWith.simple] {
    * @return A modified copy of {@code this} object
    */
   [deprecation v]
-  [type.typeValue.relative] [v.names.with]([atNullableAccept v][v.unwrappedElementType] value);
+  [type.typeValue.relative] [v.names.with]([unwrappedOptionalType v] value);
 
   /**
    * Copy the current immutable object by setting an optional value for the [sourceDocRef type v] attribute.
@@ -2221,7 +2277,9 @@ public static [type.typeValue.relative] [type.factoryOf.simple]([for v in type.c
 [/template]
 
 [template immutableImplementationType Attribute v][output.trim]
-[if v.generateJdkOnly][-- for now jdk only will be the same --]
+[if v.jdkOptional][-- need to watch out that here atNullable goes inside! --]
+  [atNullable][v.wrappedElementType]
+[else if v.generateJdkOnly][-- for now jdk only will be the same --]
   [v.type]
 [else if v.generateOrdinalValueSet]
   org.immutables.ordinal.ImmutableOrdinalSet<[v.elementType]>
@@ -2332,7 +2390,7 @@ public static [type.typeValue.relative] [type.factoryOf.simple]([for v in type.c
   [a.name] == [getOther]
 [else if a.arrayType]
   java.util.Arrays.equals([a.name], [getOther])
-[else if a.nullable]
+[else if a.nullable or a.jdkOptional]
   [if a.generateJdkOnly]
     [objectsUtilRef a.containingType]equals([a.name], [getOther])
   [else]
@@ -2557,7 +2615,13 @@ private static <K extends Comparable<K>, V> java.util.[unmodifiableSortedMapInte
 [/template]
 
 [template defineOrResetBuildingField Attribute v Boolean declare]
-  [if v.containerType]
+  [if v.jdkOptional][-- Combine with else case at the bottom?  --]
+    [if declare]
+private [atNullable][v.wrappedElementType] [v.name];
+    [else]
+[v.name] = null;
+    [/if]
+  [else if v.containerType]
     [if v.generateJdkOnly]
       [if v.optionalType]
 [if declare]private [v.type] [/if][v.name] = [optionalEmpty v];
@@ -2657,7 +2721,7 @@ return [if type.innerBuilder.isExtending]([type.typeBuilder]) [/if]this;
 
 [template optionalPresent Attribute a][if a.fugueOptional]isDefined[else]isPresent[/if]()[/template]
 
-[template atNullableAccept Attribute a][if a.optionalType and a.optionalAcceptNullable][atNullable][/if][/template]
+[template unwrappedOptionalType Attribute a][if a.optionalType and a.optionalAcceptNullable][atNullable][a.wrappedElementType][else][a.unwrappedElementType][/if][/template]
 
 [template atNullable][if classpath.available 'javax.annotation.Nullable']@javax.annotation.Nullable [/if][/template]
 
